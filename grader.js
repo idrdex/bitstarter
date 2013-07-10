@@ -24,8 +24,7 @@ References:
 
 var fs = require('fs');
 var rest = require('restler');
-var request = require("request")
-var sys = require('util');
+var util = require('util');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
@@ -61,17 +60,28 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     return out;
 };
 
-var checkUrl = function(url, checksfile) {
+var processUrl = function(url, checksfile) {
     var tmpFile = "tmp.htm";
     // request(url).pipe(fs.createWriteStream(tmpFile));
 
+    var processResponse = buildfn(tmpFile, checksfile);
+    rest.get(url).on('complete', processResponse);
+};
 
-    rest.get(url).on('end', function(response) {
-        fs.writeFileSync(tmpFile, response)
-    });
+var buildfn = function(tmpFile, checksfile) {
+    var processResponse = function(result, response) {
+        if (result instanceof Error) {
+            console.error('Error: ' + util.format(response.message));
+        } else {
+            console.error("Wrote %s", tmpFile);
+            fs.writeFileSync(tmpFile, result);
+            var checkJson = checkHtmlFile(tmpFile, checksfile);
+            var outJson = JSON.stringify(checkJson, null, 4);
+            console.log(outJson);
 
-
-    return checkHtmlFile(tmpFile, checksfile);
+        }
+    };    
+    return processResponse;
 };
 
 var clone = function(fn) {
@@ -81,15 +91,16 @@ var clone = function(fn) {
 };
 
 if(require.main == module) {
+    console.log("test")
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-         .option('-u, --url <url>', 'URL to .html', clone(rest.get), URL_DEFAULT)
+        .option('-u, --url <url>', 'URL to .html', URL_DEFAULT)
         .parse(process.argv);
     // var checkJson = checkHtmlFile(program.file, program.checks);
-    var checkJson = checkUrl(program.url, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    // var outJson = JSON.stringify(checkJson, null, 4);
+    // console.log(outJson);
+    processUrl(program.url, program.checks);
 } else {
-    exports.checkUrl = checkUrl;
+    exports.processUrl = processUrl;
 }
