@@ -23,10 +23,14 @@ References:
 */
 
 var fs = require('fs');
+var rest = require('restler');
+var request = require("request")
+var sys = require('util');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "https://spark-public.s3.amazonaws.com/startup/code/bitstarter.html";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -40,6 +44,7 @@ var assertFileExists = function(infile) {
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
 };
+
 
 var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
@@ -56,6 +61,19 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     return out;
 };
 
+var checkUrl = function(url, checksfile) {
+    var tmpFile = "tmp.htm";
+    // request(url).pipe(fs.createWriteStream(tmpFile));
+
+
+    rest.get(url).on('end', function(response) {
+        fs.writeFileSync(tmpFile, response)
+    });
+
+
+    return checkHtmlFile(tmpFile, checksfile);
+};
+
 var clone = function(fn) {
     // Workaround for commander.js issue.
     // http://stackoverflow.com/a/6772648
@@ -66,10 +84,12 @@ if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+         .option('-u, --url <url>', 'URL to .html', clone(rest.get), URL_DEFAULT)
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
+    // var checkJson = checkHtmlFile(program.file, program.checks);
+    var checkJson = checkUrl(program.url, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
 } else {
-    exports.checkHtmlFile = checkHtmlFile;
+    exports.checkUrl = checkUrl;
 }
